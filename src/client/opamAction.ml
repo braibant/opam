@@ -123,6 +123,11 @@ let install_package t nv =
         );
         OpamFilename.exists src_file in
 
+      (* is the build directory going to stay? *)
+      let persistent = OpamFile.OPAM.is_persistent opam_ in
+      
+      let copy = if persistent then OpamFilename.link  else OpamFilename.copy in 
+
       (* Install a list of files *)
       let install_files dst_fn files_fn =
         let dst_dir = dst_fn t.root t.switch name in
@@ -136,8 +141,8 @@ let install_package t nv =
             let dst_file = match dst with
               | None   -> OpamFilename.create dst_dir (OpamFilename.basename src_file)
               | Some d -> OpamFilename.create dst_dir d in
-            if check ~src:build_dir ~dst:dst_dir base then
-              OpamFilename.copy ~src:src_file ~dst:dst_file;
+            if check ~src:build_dir ~dst:dst_dir base then  
+              copy ~src:src_file ~dst:dst_file;
           ) files in
 
       (* bin *)
@@ -194,7 +199,6 @@ let install_package t nv =
     );
       
       (* should we remove the build dir? *)
-      let persistent = OpamFile.OPAM.is_persistent opam_ in
       if not (!OpamGlobals.keep_build_dir || !OpamGlobals.debug || persistent) then
 	OpamFilename.rmdir build_dir
   )
