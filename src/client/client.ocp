@@ -10,6 +10,7 @@ begin library "opam-client"
     "opamConfigCommand.ml"
     "opamRepositoryCommand.ml"
     "opamPinCommand.ml"
+    "opamCoqCommand.ml"
     "opamClient.ml"
     "opamArg.ml"
   ]

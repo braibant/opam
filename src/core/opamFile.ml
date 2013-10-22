@@ -110,6 +110,7 @@ module Syntax = struct
       ) file.file_contents in
     { file with file_contents; file_format = OpamVersion.of_string "1" }
 
+
 end
 
 module X = struct
@@ -593,6 +594,29 @@ module X = struct
 
   end
 
+  (* module Coqs = struct *)
+  (*   let internal = "coqs" *)
+  (*   type t = OpamSwitch.Set.t package_map *)
+
+  (*   let empty = OpamPackage.Map.empty *)
+
+  (*   let to_string _ t = *)
+  (*     let l = *)
+  (*       OpamPackage.Map.fold (fun package switch lines -> *)
+  (*         (OpamPackage.to_string package) :: OpamSwitch.Set.elements; OpamSwitch.to_string switch] :: lines *)
+  (*       ) t [] in *)
+  (*     Lines.to_string l *)
+
+  (*   let of_channel _ ic = *)
+  (*     let l = Lines.of_channel ic in *)
+  (*     List.fold_left (fun map -> function *)
+  (*       | []            -> map *)
+  (*       | [package; switch] -> OpamPackage.Map.add (OpamPackage.of_string package) *)
+  (*                             (OpamSwitch.of_string switch) map *)
+  (*       | _             -> failwith "coqs" *)
+  (*     ) OpamPackage.Map.empty l *)
+  (* end *)
+
   module Config = struct
 
     let internal = "config"
@@ -801,6 +825,7 @@ module X = struct
     let s_messages    = "messages"
     let s_post_messages = "post-messages"
     let s_bug_reports = "bug-reports"
+    let s_persistent = "persistent"
 
     let opam_1_0_fields = [
       s_opam_version;
@@ -853,7 +878,7 @@ module X = struct
       Syntax.to_1_0 file
 
     let valid_fields =
-      opam_1_0_fields @ opam_1_1_fields
+      opam_1_0_fields @ opam_1_1_fields 
 
     let check name = function
       | None    -> OpamGlobals.error_and_exit "Invalid OPAM file (%s)" name
@@ -887,6 +912,7 @@ module X = struct
     let post_messages t = t.post_messages
     let opam_version t = t.opam_version
     let bug_reports t = t.bug_reports
+
 
     let with_name t name = { t with name = Some name }
     let with_version t version = { t with version = Some version }
@@ -1064,6 +1090,8 @@ module X = struct
         build_test; build_doc; depexts; messages; post_messages;
         bug_reports;
       }
+
+    let is_persistent t = List.mem s_persistent t.tags
   end
 
   module Dot_install = struct
@@ -1888,6 +1916,7 @@ module Aliases = struct
   include Aliases
   include Make (Aliases)
 end
+
 
 module Reinstall = struct
   include Reinstall

@@ -213,6 +213,8 @@ module OPAM: sig
   (** Convert to OPAM 1.0 *)
   val to_1_0: file -> file
 
+  (** Keep build dir?  *)
+  val is_persistent : t -> bool
 end
 
 (** Package descriptions: [$opam/descr/] *)

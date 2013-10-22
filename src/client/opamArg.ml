@@ -1188,6 +1188,62 @@ let pin =
   Term.(pure pin $global_options $force $kind $edit $remove $list $package $pin_option),
   term_info "pin" ~doc ~man
 
+(* Coq *)
+let coq_doc = "Coq specific commands."
+let coq =
+  let doc = coq_doc in
+  let commands = [
+    ["install"]      , `install  , "";
+    ["remove"]       , `remove   , "Remove the given switch.";
+    ["list"]       , `list   , "";
+    ["show"]         , `current  , "Show the current coq version.";
+  ] in
+  let man = [
+    `S "DESCRIPTION";
+    `P "Lore Ipsum";
+    `P "Lore Ipsum"
+  ] @ mk_subdoc commands in
+
+  let command, params = mk_subcommands_with_default commands
+      "If a switch is given instead of an usual command, this command \
+       will switch to the given state. You will then need to run \
+       $(b,eval `opam config env`) to update your environment variables." in
+  let installed =
+    mk_flag ["i";"installed"] "List installed compiler switches only." in
+  let all =
+    mk_flag ["a";"all"]
+      "List all the compilers which can be installed on the system." in
+
+  let coq global_options
+      command 
+      installed 
+      all
+      params 
+      =
+    apply_global_options global_options;
+    match command, params with
+    | Some `default _, [] 
+    | None      , []
+    | Some `list, [] -> Client.COQ.list ~installed ~all
+
+    | Some `install, [coq] ->
+      Client.COQ.install (OpamPackage.of_string coq)
+
+    | Some `remove, switches ->
+      List.iter
+        (fun switch -> Client.COQ.remove (OpamSwitch.of_string switch))
+        switches
+    | Some `current, [] -> ()
+    | _, l ->
+      OpamGlobals.error_and_exit "wrong number of arguments (%d)"
+        (List.length l) in
+
+
+  Term.(pure coq
+    $global_options $command
+    $installed $all $params),
+  term_info "coq" ~doc ~man
+
 (* HELP *)
 let help =
   let doc = "Display help about OPAM and OPAM commands." in
@@ -1268,6 +1324,7 @@ let commands = [
   switch;
   pin;
   help;
+  coq
 ]
 
 let is_external_command () =

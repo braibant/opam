@@ -191,10 +191,18 @@ let install_package t nv =
         OpamSystem.internal_error
           "While installing the following files:\n%s"
           (String.concat "\n" (List.map print !warnings));
-      )
     );
-  if not (!OpamGlobals.keep_build_dir || !OpamGlobals.debug) then
-    OpamFilename.rmdir build_dir
+      
+      (* should we remove the build dir? *)
+      let persistent = OpamFile.OPAM.is_persistent opam_ in
+      if not (!OpamGlobals.keep_build_dir || !OpamGlobals.debug || persistent) then
+	OpamFilename.rmdir build_dir
+  )
+  else 
+    begin
+      if not (!OpamGlobals.keep_build_dir || !OpamGlobals.debug) then
+      OpamFilename.rmdir build_dir
+    end
 
 (* Prepare the package build:
    * apply the patches

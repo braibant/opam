@@ -26,6 +26,7 @@ let commands = [
   switch;
   pin;
   help;
+  coq
 ]
 
 let () =

@@ -32,7 +32,7 @@ module Version = struct
 
   let of_string = function
     | "pinned"  -> Pinned
-    | v         -> Version v
+    | str         -> Version str
 
   let pinned = Pinned
 

@@ -78,6 +78,10 @@ val pin: command
 (** opam help *)
 val help: command
 
+(** opam  *)
+val coq: command
+
+
 (** {2 Flags} *)
 
 (** --short *)
