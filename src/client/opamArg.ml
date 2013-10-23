@@ -1193,15 +1193,16 @@ let coq_doc = "Coq specific commands."
 let coq =
   let doc = coq_doc in
   let commands = [
-    ["install"]      , `install  , "";
-    ["remove"]       , `remove   , "Remove the given switch.";
-    ["list"]       , `list   , "";
+    ["install"]      , `install  , "Install a given Coq version in a clone of the current switch";
+    ["remove"]       , `remove   , "Remove the switch associated to this Coq version.";
+    ["list"]       , `list   , "List Coq switches";
     ["show"]         , `current  , "Show the current coq version.";
+    ["switch"], `switch  , "Switch to a given Coq version"
   ] in
   let man = [
     `S "DESCRIPTION";
-    `P "Lore Ipsum";
-    `P "Lore Ipsum"
+    `P "This command provides short-hands to install, and switch between, Coq versions. Using $(b,opam coq install coq.<version>) will create a new switch for the current OCaml compiler; reinstall the current set of packages; and install the package coq.<version>";
+    `P "The command $(b,opam coq switch <coq>) tests whether there is a single switch that corresponds to the Coq version <coq>, and switch to this state if it is the case. Otherwise, it does nothing, and tell the user to use the simpler $(b, opam switch) command.";
   ] @ mk_subdoc commands in
 
   let command, params = mk_subcommands_with_default commands
@@ -1224,7 +1225,11 @@ let coq =
     match command, params with
     | Some `default _, [] 
     | None      , []
-    | Some `list, [] -> OpamCoqCommand.list ~installed ~all
+    | Some `list, [] -> 
+      OpamCoqCommand.list ~installed ~all
+
+    | Some `switch, [coq] ->
+      OpamCoqCommand.switch (OpamPackage.of_string coq)
 
     | Some `install, [coq] ->
       OpamCoqCommand.install (OpamPackage.of_string coq)
