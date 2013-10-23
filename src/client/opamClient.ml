@@ -1077,7 +1077,6 @@ module API = struct
   module REPOSITORY = OpamRepositoryCommand
   module CONFIG     = OpamConfigCommand
   module SWITCH     = OpamSwitchCommand
-  module COQ = OpamCoqCommand
 end
 
 let read_lock f =
@@ -1204,8 +1203,5 @@ module SafeAPI = struct
       read_lock API.PIN.list
 
   end
-
-  module COQ = API.COQ
-
 
 end

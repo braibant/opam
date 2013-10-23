@@ -150,15 +150,6 @@ module API: sig
 
   end
 
-  module COQ : sig
-    val install: package -> unit
-    
-    val remove: switch -> unit
-      
-    val switch: package -> unit
-
-    val list : installed:bool -> all:bool -> unit
-  end
 end
 
 (** Call an unsafe function while taking the global lock. *)

@@ -1224,15 +1224,15 @@ let coq =
     match command, params with
     | Some `default _, [] 
     | None      , []
-    | Some `list, [] -> Client.COQ.list ~installed ~all
+    | Some `list, [] -> OpamCoqCommand.list ~installed ~all
 
     | Some `install, [coq] ->
-      Client.COQ.install (OpamPackage.of_string coq)
+      OpamCoqCommand.install (OpamPackage.of_string coq)
 
-    | Some `remove, switches ->
+    | Some `remove, coqs ->
       List.iter
-        (fun switch -> Client.COQ.remove (OpamSwitch.of_string switch))
-        switches
+        (fun coq -> OpamCoqCommand.remove (OpamPackage.of_string coq))
+	coqs
     | Some `current, [] -> ()
     | _, l ->
       OpamGlobals.error_and_exit "wrong number of arguments (%d)"

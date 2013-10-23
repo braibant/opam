@@ -3,6 +3,14 @@
 open OpamTypes
 open OpamState.Types
 
+(* The rationale behind this file is that it automates the calls to
+   more primitive opam commands. Despite the name though, it sits
+   above OpamClient. Indeed, we need to perform calls to the safe API
+   exposed by OpamClient, rather than direct calls to more primitive
+   functions (e.g. exposed OpamSwitchCommand). The later solution
+   proved troublesome, because it led to spurious error messages, and
+   incorrect switches between staes. *)
+
 (* create a new switch, based on the current compiler and the given
    coq version. It will reinstall the packages that existed in the
    current switch. The naming scheme of the new switch is
@@ -33,9 +41,9 @@ let install coq =
 
   OpamGlobals.msg "New switch for Coq: %s\n"(OpamSwitch.to_string switch);
 
-  OpamSwitchCommand.install ~quiet:false ~warning:true ~update_config:false switch compiler;
+  OpamClient.SafeAPI.SWITCH.install ~quiet:false ~warning:true ~update_config:false switch compiler;
 
-  OpamSwitchCommand.switch ~quiet:true ~warning:false switch;
+  OpamClient.SafeAPI.SWITCH.switch ~quiet:true ~warning:false switch;
   
   let t = OpamState.load_state "coq-install-2" in
 
@@ -49,10 +57,12 @@ let install coq =
     OpamSolution.check_solution t solution
   with
   | e -> 
-    OpamSwitchCommand.switch ~quiet:true ~warning:false old_switch;
-    OpamSwitchCommand.remove switch
+    begin 
+      OpamClient.SafeAPI.SWITCH.switch ~quiet:false ~warning:false old_switch;
+      OpamClient.SafeAPI.SWITCH.remove switch
+    end
 
-  
+
 let list ~installed ~all =
   let t = OpamState.load_state "switch-list" in
 
@@ -117,7 +127,7 @@ let switch coq =
   try 
     begin match OpamPackage.Map.find coq map with
     | [] -> assert false
-    | [t] -> OpamSwitchCommand.switch ~quiet:true ~warning:false t
+    | [t] -> OpamClient.SafeAPI.SWITCH.switch ~quiet:true ~warning:false t
     | _ -> OpamGlobals.error "Multiple switches exists for %s. Please use [opam switch] to select one."  
       (OpamPackage.to_string coq)
     end
@@ -125,19 +135,22 @@ let switch coq =
     OpamGlobals.msg "No switch for %s. Installing one now...\n" (OpamPackage.to_string coq);
     install coq
   
-let remove coq = () 
-  (* let t = OpamState.load_state "coq-remove-1" in *)
-  (* let map = OpamState.installed_versions t (OpamPackage.Name.of_string "coq") in *)
+let remove coq = 
+  let t = OpamState.load_state "coq-remove-1" in
+  let map = OpamState.installed_versions t (OpamPackage.Name.of_string "coq") in
   
-  (* try  *)
-  (*   begin match OpamPackage.Map.find coq map with *)
-  (*   | [] -> () *)
-  (*   | [t] -> OpamSwitchCommand.remove t *)
-  (*   | _ -> OpamGlobals.error "Multiple switches exists for %s. Please use [opam switch remove] to select the one to remove."   *)
-  (*     (OpamPackage.to_string coq) *)
-  (*   end *)
-  (* with Not_found -> () *)
-
+  try 
+    begin match OpamPackage.Map.find coq map with
+    | [] -> assert false
+    | [t] -> OpamClient.SafeAPI.SWITCH.remove t
+    | _ -> OpamGlobals.error "Multiple switches exists for %s. Please use [opam switch remove] to select the one to remove."  
+      (OpamPackage.to_string coq)
+    end
+  with Not_found -> 
+    begin 
+      OpamGlobals.msg "No switch for %s. Nothing to do. \n" (OpamPackage.to_string coq);
+      ()
+    end
   
  
       
