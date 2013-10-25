@@ -1214,11 +1214,14 @@ let coq =
   let all =
     mk_flag ["a";"all"]
       "List all the compilers which can be installed on the system." in
-
+  let keep =
+    mk_flag ["keep"]
+      "Import the packages from the current switch into the new Coq switch" in
   let coq global_options
       command 
       installed 
       all
+      keep 
       params 
       =
     apply_global_options global_options;
@@ -1229,10 +1232,10 @@ let coq =
       OpamCoqCommand.list ~installed ~all
 
     | Some `switch, [coq] ->
-      OpamCoqCommand.switch (OpamPackage.of_string coq)
+      OpamCoqCommand.switch ~keep (OpamPackage.of_string coq)
 
     | Some `install, [coq] ->
-      OpamCoqCommand.install (OpamPackage.of_string coq)
+      OpamCoqCommand.install ~keep (OpamPackage.of_string coq)
 
     | Some `remove, coqs ->
       List.iter
@@ -1246,7 +1249,7 @@ let coq =
 
   Term.(pure coq
     $global_options $command
-    $installed $all $params),
+    $installed $all $keep $params),
   term_info "coq" ~doc ~man
 
 (* HELP *)

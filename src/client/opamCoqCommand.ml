@@ -3,6 +3,8 @@
 open OpamTypes
 open OpamState.Types
 
+let ncoq = OpamPackage.Name.of_string "coq"
+
 (* The rationale behind this file is that it automates the calls to
    more primitive opam commands. Despite the name though, it sits
    above OpamClient. Indeed, we need to perform calls to the safe API
@@ -14,22 +16,30 @@ open OpamState.Types
 (* create a new switch, based on the current compiler and the given
    coq version. It will reinstall the packages that existed in the
    current switch. The naming scheme of the new switch is
-   "camlversion--coqversion". *)
-let install coq =
+   "camlversion--coqversion".  
+   
+   The keep option tells whether the new switch should contain the
+   same pakcages as the previous one
+
+*)
+let install ~keep coq =
   let t = OpamState.load_state "coq-install-1" in
   let old_switch = t.switch in 
 
   (* compute package version map for the new switch *)
-  let map = OpamState.installed_map t in
-  let map = OpamPackage.Name.Map.remove (OpamPackage.name coq) map in 
-  let map = OpamPackage.Name.Map.add (OpamPackage.name coq) (OpamPackage.version coq) map in 
-
+  let map = begin
+    if keep 
+    then 
+      let map = OpamState.installed_map t in
+      let map = OpamPackage.Name.Map.remove (OpamPackage.name coq) map in 
+      OpamPackage.Name.Map.add (OpamPackage.name coq) (OpamPackage.version coq) map 
+    else
+      OpamPackage.Name.Map.add (OpamPackage.name coq) (OpamPackage.version coq) (OpamPackage.Name.Map.empty)
+  end in
   let packages = List.map (fun (n,v) -> OpamPackage.create n v) (OpamPackage.Name.Map.bindings map) in 
   let package_set = OpamPackage.Set.of_list packages in 
 
   let roots = OpamPackage.names_of_packages package_set in 
-
-  (* let _ = OpamPackage.Name.Set.iter (fun n -> OpamGlobals.msg "%s\n" (OpamPackage.Name.to_string n)) roots in  *)
 
   (* The set of constrained atoms from packages (with versions) *)
   let atoms = OpamSolution.eq_atoms_of_packages package_set in
@@ -54,7 +64,11 @@ let install coq =
   try 
     let  solution = OpamSolution.resolve_and_apply ~force:true t (Install roots) 
       {wish_install; wish_remove ; wish_upgrade} in
-    OpamSolution.check_solution t solution
+    OpamSolution.check_solution t solution;
+    (* Pin the Coq version in this switch  *)
+    (* TODO: currently, pinning the package remove the build dir, which is troublesome for our --local packages... *)
+    let pin = { pin_package = OpamPackage.name coq; pin_option = Version (OpamPackage.version coq) } in
+    OpamClient.SafeAPI.PIN.pin ~force:true pin
   with
   | e -> 
     begin 
@@ -72,17 +86,32 @@ let list ~installed ~all =
   let s_current = "C" in 
   let s_not_installed = "--" in 
 
-  let installed = OpamPackage.Map.fold (fun coq -> 
-    List.fold_right (fun s acc -> 
+  let installed,coqs = OpamPackage.Map.fold (fun coq -> 
+    (* Return the actual versionned package  *)
+    let coq = OpamState.pinning_version t coq in 
+    List.fold_right (fun s (acc,coqs) -> 
       let switch = OpamSwitch.to_string s in 
       let scoq = OpamPackage.to_string coq in 
       let status = if s = t.switch then s_current else s_installed in 
       let descr = OpamFile.Descr.safe_read (OpamPath.descr t.root coq) in 
-      (switch,status,scoq,descr)::acc 
-    )) (OpamState.installed_versions t (OpamPackage.Name.of_string "coq")) [] in
+      let coqs = OpamPackage.Set.add coq coqs in  
+      (switch,status,scoq,descr)::acc, coqs
+    )) (OpamState.installed_versions t ncoq) ([], OpamPackage.Set.empty) in
 
-  let all = installed in 
-
+  let all = 
+    if all 
+    then let packages = Lazy.force (t.available_packages) in 
+	 let available_coqs = OpamPackage.Set.filter (fun p -> OpamPackage.name p = ncoq) packages in 
+	 let other_coqs = OpamPackage.Set.diff available_coqs coqs in 
+	 let other_coqs = OpamPackage.Set.fold 
+	   (fun coq acc ->
+	     let descr = OpamFile.Descr.safe_read (OpamPath.descr t.root coq) in 
+	     (s_not_installed, s_not_installed, OpamPackage.to_string coq, descr) :: acc) other_coqs []
+	 in 
+	 installed @ other_coqs
+    else 
+      installed
+  in 
   let max_switch, max_status, max_coq =
     List.fold_left (fun (n,s,c) (switch, status, coq, _) ->
       let n = max (String.length switch) n in
@@ -119,26 +148,33 @@ let list ~installed ~all =
       colored_descr colored_body in
 
   List.iter print_coq all
-  
-let switch coq =
-  let t = OpamState.load_state "coq-switch-1" in
+
+(* since some packages may be pinned, there is some work to do here to get the right version *)
+let installed_versions t =
   let map = OpamState.installed_versions t (OpamPackage.Name.of_string "coq") in
+  let map = OpamPackage.Map.fold 
+    (fun k v acc -> OpamPackage.Map.add (OpamState.pinning_version t k) v acc) map OpamPackage.Map.empty in 
+  map
+
+
+let switch ~keep coq =
+  let t = OpamState.load_state "coq-switch-1" in
+  let map = installed_versions t in 
   
   try 
     begin match OpamPackage.Map.find coq map with
     | [] -> assert false
-    | [t] -> OpamClient.SafeAPI.SWITCH.switch ~quiet:true ~warning:false t
+    | [t] -> OpamClient.SafeAPI.SWITCH.switch ~quiet:true ~warning:true t
     | _ -> OpamGlobals.error "Multiple switches exists for %s. Please use [opam switch] to select one."  
       (OpamPackage.to_string coq)
     end
   with Not_found -> 
     OpamGlobals.msg "No switch for %s. Installing one now...\n" (OpamPackage.to_string coq);
-    install coq
+    install ~keep coq
   
 let remove coq = 
   let t = OpamState.load_state "coq-remove-1" in
-  let map = OpamState.installed_versions t (OpamPackage.Name.of_string "coq") in
-  
+  let map = installed_versions t in 
   try 
     begin match OpamPackage.Map.find coq map with
     | [] -> assert false
