@@ -1241,7 +1241,8 @@ let coq =
       List.iter
         (fun coq -> OpamCoqCommand.remove (OpamPackage.of_string coq))
 	coqs
-    | Some `current, [] -> ()
+    | Some `current, [] -> 
+      ()
     | _, l ->
       OpamGlobals.error_and_exit "wrong number of arguments (%d)"
         (List.length l) in

@@ -880,6 +880,7 @@ let installed_versions t name =
       OpamFile.Installed.safe_read (OpamPath.Switch.installed t.root switch) in
     if is_name_installed_aux installed name then
       let nv = find_installed_package_by_name_aux installed name in
+      Printf.printf "debug: %s\n" (OpamPackage.to_string nv);
       if OpamPackage.Map.mem nv map then
         let aliases = OpamPackage.Map.find nv map in
         let map = OpamPackage.Map.remove nv map in

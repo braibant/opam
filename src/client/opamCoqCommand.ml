@@ -76,10 +76,48 @@ let install ~keep coq =
       OpamClient.SafeAPI.SWITCH.remove switch
     end
 
+let pinning_version t switch package =
+  let pinned = OpamFile.Pinned.safe_read (OpamPath.Switch.pinned t.root switch) in
+  let name = OpamPackage.name package in
+  try
+    match OpamPackage.Name.Map.find name pinned with
+    | Version v -> OpamPackage.create name v
+    | _ -> raise Not_found
+  with Not_found ->  package
+
+(* since some packages may be pinned, there is some work to do here to get the right version *)
+let installed_versions t =
+  let map = OpamSwitch.Map.fold (fun switch _ accu ->
+    let installed_f = OpamPath.Switch.installed t.root switch in
+    let installed = OpamFile.Installed.safe_read installed_f in
+    let coqs = OpamPackage.Set.filter (fun nv -> OpamPackage.name nv = ncoq) installed in 
+    OpamPackage.Set.fold (fun coq map -> 
+      let coq = pinning_version t switch coq in 
+      if OpamPackage.Map.mem coq map 
+      then
+	let aliases = OpamPackage.Map.find coq map in
+        let map = OpamPackage.Map.remove coq map in
+	OpamPackage.Map.add coq (switch::aliases) map
+      else
+	OpamPackage.Map.add coq [switch] map
+    ) coqs accu
+  ) t.aliases OpamPackage.Map.empty
+  in 
+  (* let _ = OpamPackage.Map.iter (fun k v -> OpamGlobals.msg "%s -> %s\n" (OpamPackage.to_string k) (OpamMisc.pretty_list (List.map OpamSwitch.to_string v))) map in *)
+  map
+
+let available_coqs t =
+  let package_index =
+    OpamFile.Package_index.safe_read (OpamPath.package_index t.root) in
+  OpamPackage.Map.fold (fun p _ accu ->
+    if OpamPackage.name p = ncoq 
+    then OpamPackage.Set.add p accu 
+    else accu
+  ) package_index OpamPackage.Set.empty
 
 let list ~installed ~all =
   let t = OpamState.load_state "switch-list" in
-
+  let map = installed_versions t  in 
   (* switch -- status -- coq-version -- coq descr *)
 
   let s_installed = "I" in
@@ -88,7 +126,6 @@ let list ~installed ~all =
 
   let installed,coqs = OpamPackage.Map.fold (fun coq -> 
     (* Return the actual versionned package  *)
-    let coq = OpamState.pinning_version t coq in 
     List.fold_right (fun s (acc,coqs) -> 
       let switch = OpamSwitch.to_string s in 
       let scoq = OpamPackage.to_string coq in 
@@ -96,19 +133,19 @@ let list ~installed ~all =
       let descr = OpamFile.Descr.safe_read (OpamPath.descr t.root coq) in 
       let coqs = OpamPackage.Set.add coq coqs in  
       (switch,status,scoq,descr)::acc, coqs
-    )) (OpamState.installed_versions t ncoq) ([], OpamPackage.Set.empty) in
+    )) map ([], OpamPackage.Set.empty) in
 
   let all = 
     if all 
-    then let packages = Lazy.force (t.available_packages) in 
-	 let available_coqs = OpamPackage.Set.filter (fun p -> OpamPackage.name p = ncoq) packages in 
-	 let other_coqs = OpamPackage.Set.diff available_coqs coqs in 
-	 let other_coqs = OpamPackage.Set.fold 
-	   (fun coq acc ->
-	     let descr = OpamFile.Descr.safe_read (OpamPath.descr t.root coq) in 
-	     (s_not_installed, s_not_installed, OpamPackage.to_string coq, descr) :: acc) other_coqs []
+    then 
+      let available_coqs = available_coqs t in 
+      let other_coqs = OpamPackage.Set.diff available_coqs coqs in 
+      let other_coqs = OpamPackage.Set.fold 
+	(fun coq acc ->
+	  let descr = OpamFile.Descr.safe_read (OpamPath.descr t.root coq) in 
+	  (s_not_installed, s_not_installed, OpamPackage.to_string coq, descr) :: acc) other_coqs []
 	 in 
-	 installed @ other_coqs
+      installed @ other_coqs
     else 
       installed
   in 
@@ -149,18 +186,11 @@ let list ~installed ~all =
 
   List.iter print_coq all
 
-(* since some packages may be pinned, there is some work to do here to get the right version *)
-let installed_versions t =
-  let map = OpamState.installed_versions t (OpamPackage.Name.of_string "coq") in
-  let map = OpamPackage.Map.fold 
-    (fun k v acc -> OpamPackage.Map.add (OpamState.pinning_version t k) v acc) map OpamPackage.Map.empty in 
-  map
-
 
 let switch ~keep coq =
   let t = OpamState.load_state "coq-switch-1" in
   let map = installed_versions t in 
-  
+  let _ = OpamPackage.Map.iter (fun k v -> OpamGlobals.msg "%s -> %s" (OpamPackage.to_string k) (OpamMisc.pretty_list (List.map OpamSwitch.to_string v))) map in
   try 
     begin match OpamPackage.Map.find coq map with
     | [] -> assert false
