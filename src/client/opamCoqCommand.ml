@@ -190,7 +190,7 @@ let list ~installed ~all =
 let switch ~keep coq =
   let t = OpamState.load_state "coq-switch-1" in
   let map = installed_versions t in 
-  let _ = OpamPackage.Map.iter (fun k v -> OpamGlobals.msg "%s -> %s" (OpamPackage.to_string k) (OpamMisc.pretty_list (List.map OpamSwitch.to_string v))) map in
+  (* let _ = OpamPackage.Map.iter (fun k v -> OpamGlobals.msg "%s -> %s" (OpamPackage.to_string k) (OpamMisc.pretty_list (List.map OpamSwitch.to_string v))) map in *)
   try 
     begin match OpamPackage.Map.find coq map with
     | [] -> assert false
